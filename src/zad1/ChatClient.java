@@ -6,6 +6,7 @@
 
 package zad1;
 
+import zad1.exception.checked.ClientNotLoggedInException;
 import zad1.exception.unchecked.ClientException;
 
 import java.io.BufferedReader;
@@ -25,7 +26,8 @@ public class ChatClient {
 
     private final String id;
     private final Socket socket;
-    private final PrintWriter out;
+    private final InetSocketAddress address;
+    private PrintWriter out;
     private final Thread listeningThread;
     private final Log log;
 
@@ -33,9 +35,7 @@ public class ChatClient {
         this.id = id;
         this.log = new Log();
         this.socket = new Socket();
-        prepareSocket(socket, host, serverPort);
-        this.out = createPrintWriter(socket);
-
+        this.address = new InetSocketAddress(host, serverPort);
         this.listeningThread = Thread.ofVirtual()
                 .unstarted(() -> {
                     try (var in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
@@ -53,24 +53,28 @@ public class ChatClient {
                 });
     }
 
-    public void login() {
-        send("%s:%s".formatted(LOGIN_REQUEST, id));
+    public void login() throws ClientNotLoggedInException {
+        connectToServer(socket, address);
+        this.out = createPrintWriter(socket);
         listeningThread.start();
+        send("%s:%s".formatted(LOGIN_REQUEST, id));
     }
 
-    public void logout() {
+    public void logout() throws ClientNotLoggedInException {
         send("%s:%s".formatted(LOGOUT_REQUEST, id));
     }
 
-    public void sendMessage(String message) {
+    public void sendMessage(String message) throws ClientNotLoggedInException {
         send("%s:%s".formatted(SEND_REQUEST, message));
     }
 
-    public void send(String req) {
+    public void send(String req) throws ClientNotLoggedInException {
+        if (out == null)
+            throw new ClientNotLoggedInException("Client need to be connected to server in order to send messages");
         out.println(req);
     }
 
-    private static void prepareSocket(Socket socket, String host, int serverPort) {
+    private static void connectToServer(Socket socket, InetSocketAddress address) {
         try {
             socket.setSoTimeout(30000);
             socket.setReuseAddress(true);
@@ -78,7 +82,7 @@ public class ChatClient {
             System.out.printf("Exception while configuring the socket, cause %s. Continuing with default socket setting\n", e.getMessage());
         }
         try {
-            socket.connect(new InetSocketAddress(host, serverPort), 5000);
+            socket.connect(address, 5000);
         } catch (IOException e) {
             throw new ClientException("Exception while connection to server", e);
         }

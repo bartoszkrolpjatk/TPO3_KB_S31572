@@ -8,18 +8,21 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.concurrent.locks.Lock;
 
 public class ClientHandler {
 
     private final Socket socket;
     private final ContextHolder context;
     private final Log serverLog;
+    private final Lock lock;
     private String clientId;
 
-    public ClientHandler(Socket socket, ContextHolder context, Log serverLog) {
+    public ClientHandler(Socket socket, ContextHolder context, Log serverLog, Lock lock) {
         this.socket = socket;
         this.context = context;
         this.serverLog = serverLog;
+        this.lock = lock;
         try {
             socket.setSoTimeout(30000);
             socket.setTcpNoDelay(true);
@@ -71,19 +74,27 @@ public class ClientHandler {
     }
 
     private void loginClient(String id) {
+        lock.lock();
         try {
             context.add(id, socket);
             this.clientId = id;
             broadcast("%s logged in".formatted(id));
         } catch (IOException e) {
             System.err.printf("Cannot save client to context. Client will remain not logged in. Cause: %s\n", e.getMessage());
+        } finally {
+            lock.unlock();
         }
     }
 
     private void broadcast(String message) {
-        serverLog.log(message, true);
-        for (ClientSession session : context.getSessions()) {
-            session.out().println(message);
+        lock.lock();
+        try {
+            serverLog.log(message, true);
+            for (ClientSession session : context.getSessions()) {
+                session.out().println(message);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 }

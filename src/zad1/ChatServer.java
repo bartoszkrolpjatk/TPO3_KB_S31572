@@ -16,6 +16,7 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ChatServer {
     private static final int DEFAULT_BACKLOG = 100;
@@ -27,19 +28,17 @@ public class ChatServer {
 
     public ChatServer(int port) {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
-        var context = new ContextHolder();
         this.log = new Log();
-        try {
-            this.serverSocket = new ServerSocket(port, DEFAULT_BACKLOG);
-        } catch (IOException e) {
-            throw new InternalServerException("Exception while creating ServerSocket", e);
-        }
+
+        var context = new ContextHolder();
+        var lock = new ReentrantLock();
+        this.serverSocket = createServerSocket(port, DEFAULT_BACKLOG);
         this.acceptingThread = Thread.ofVirtual()
                 .unstarted(() -> {
                     while (!Thread.currentThread().isInterrupted()) {
                         try {
                             Socket socket = serverSocket.accept();
-                            executorService.execute(() -> new ClientHandler(socket, context, log).handle());
+                            executorService.execute(() -> new ClientHandler(socket, context, log, lock).handle());
                         } catch (IOException ignored) {}
                     }
                 });
@@ -68,6 +67,14 @@ public class ChatServer {
         }
         log.log("ChatServer: chat closed", true);
         System.out.println("Server stopped");
+    }
+
+    private static ServerSocket createServerSocket(int port, int backlog) {
+        try {
+            return new ServerSocket(port, backlog);
+        } catch (IOException e) {
+            throw new InternalServerException("Exception while creating ServerSocket", e);
+        }
     }
 
     public String getServerLog() {
