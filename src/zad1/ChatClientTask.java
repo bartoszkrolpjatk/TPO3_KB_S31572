@@ -16,7 +16,7 @@ public class ChatClientTask extends FutureTask<Void> {
         super(() -> {
             client.login();
             for(var m : messages) {
-                client.send(m);
+                client.sendMessage(m);
                 Thread.sleep(waitBetweenRequests);
             }
             client.logout();

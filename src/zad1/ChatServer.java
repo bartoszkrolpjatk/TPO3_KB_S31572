@@ -66,7 +66,7 @@ public class ChatServer {
         } catch (IOException e) {
             throw new InternalServerException("Exception while closing server socket", e);
         }
-        log.log("ChatServer: chat closed");
+        log.log("ChatServer: chat closed", true);
         System.out.println("Server stopped");
     }
 

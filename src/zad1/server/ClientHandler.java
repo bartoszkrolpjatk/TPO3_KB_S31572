@@ -37,7 +37,10 @@ public class ClientHandler {
                     switch (message.operation()) {
                         case HI -> loginClient(message.message());
                         case SEND -> broadcast("%s: %s".formatted(clientId, message.message()));
-                        case BYE -> logoutClient();
+                        case BYE -> {
+                            logoutClient();
+                            return;
+                        }
                         case EVENT -> System.err.println("Client can not broadcast messages. Skipping...");
                     }
                 } catch (InvalidMessageFormatException e) {
